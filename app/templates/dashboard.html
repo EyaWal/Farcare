@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>FarCare — Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+        h1 { font-size: 1.4rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e5e5; }
+        th { color: #666; font-weight: 600; }
+        .charts { display: flex; gap: 30px; margin-top: 30px; flex-wrap: wrap; }
+        .chart-box { flex: 1; min-width: 300px; }
+        .empty { color: #888; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>FarCare — Suivi</h1>
+     {% if alerts %}
+    <div style="background:#fff4e5; border:1px solid #f0c987; border-radius:8px; padding:12px 16px; margin-top:16px;">
+        <strong>Alertes</strong>
+        <ul style="margin:8px 0 0; padding-left:20px;">
+            {% for a in alerts %}
+            <li>{{ a.message }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if checkins %}
+    <div class="charts">
+        <div class="chart-box">
+            <canvas id="moodChart"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="sleepChart"></canvas>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Personne</th>
+                <th>Rempli par</th>
+                <th>Humeur</th>
+                <th>Sommeil</th>
+                <th>Douleur</th>
+                <th>Médicament</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in checkins %}
+            <tr>
+                <td>{{ c.created_at.strftime("%d/%m %H:%M") }}</td>
+                <td>{{ c.person_label or "—" }}</td>
+                <td>{{ "Elle/lui-même" if c.filled_by == "self" else "Toi" }}</td>
+                <td>{{ c.mood_score or "—" }}</td>
+                <td>{{ c.sleep_quality or "—" }}</td>
+                <td>{{ c.pain_level or "—" }}</td>
+                <td>{{ c.medication_taken or "—" }}</td>
+                <td>{{ c.free_notes or "" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Aucun check-in enregistré pour le moment.</p>
+    {% endif %}
+
+    <script>
+        const labels = {{ dates | tojson }};
+        const moodData = {{ mood_values | tojson }};
+        const sleepData = {{ sleep_values | tojson }};
+
+        if (labels.length > 0) {
+            new Chart(document.getElementById('moodChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Humeur (1-5)', data: moodData, borderColor: '#4f7cff', tension: 0.3 }]
+                },
+                options: { scales: { y: { min: 0, max: 5 } } }
+            });
+
+            new Chart(document.getElementById('sleepChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Sommeil (1-5)', data: sleepData, borderColor: '#2fb380', tension: 0.3 }]
+                },
+                options: { scales: { y: { min: 0, max: 5 } } }
+            });
+        }
+    </script>
+</body>
+</html>

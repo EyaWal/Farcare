@@ -34,3 +34,6 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "sleep_values": sleep_values,
         },
     )
+@router.get("/simulator")
+def simulator(request: Request):
+    return templates.TemplateResponse("simulator.html", {"request": request})

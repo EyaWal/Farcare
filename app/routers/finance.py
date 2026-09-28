@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 
+from app.schemas.finance_schema import SimulationInput
+from app.services.monte_carlo import run_monte_carlo_simulation
+
 router = APIRouter()
 
 
 @router.post("/simulate")
-def run_simulation():
-    """Placeholder — appellera app.services.monte_carlo une fois le modèle financier défini."""
-    return {"message": "endpoint à implémenter"}
+def run_simulation(params: SimulationInput):
+    return run_monte_carlo_simulation(**params.model_dump())

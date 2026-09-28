@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>FarCare — Simulateur</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+        h1 { font-size: 1.4rem; }
+        .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 20px 0; }
+        label { font-size: 0.85rem; color: #555; display: block; margin-bottom: 4px; }
+        input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { padding: 10px 18px; border: none; border-radius: 6px; background: #4f7cff; color: white; cursor: pointer; }
+        .cards { display: flex; gap: 16px; margin: 24px 0; flex-wrap: wrap; }
+        .card { flex: 1; min-width: 180px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; }
+        .card .value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
+        .card .label { font-size: 0.8rem; color: #666; }
+        .note { font-size: 0.8rem; color: #888; margin-top: 24px; }
+        a { color: #4f7cff; }
+    </style>
+</head>
+<body>
+    <h1>FarCare — Simulateur de fonds d'urgence</h1>
+    <p><a href="/dashboard">← Retour au suivi</a></p>
+
+    <div class="form">
+        <div><label>Épargne actuelle (€)</label><input id="initial_savings" type="number" value="2000"></div>
+        <div><label>Épargne mensuelle (€)</label><input id="monthly_contribution" type="number" value="150"></div>
+        <div><label>Horizon (années)</label><input id="horizon_years" type="number" value="10"></div>
+        <div><label>Risque annuel d'événement (%)</label><input id="annual_event_probability" type="number" value="15"></div>
+        <div><label>Coût médian d'un événement (€)</label><input id="median_event_cost" type="number" value="3000"></div>
+    </div>
+    <button onclick="runSimulation()">Simuler</button>
+
+    <div class="cards" id="cards" style="display:none;">
+        <div class="card"><div class="label">Risque de passer sous zéro</div><div class="value" id="shortfall"></div></div>
+        <div class="card"><div class="label">Fonds recommandé (90 % des cas)</div><div class="value" id="fund"></div></div>
+        <div class="card"><div class="label">Épargne finale médiane</div><div class="value" id="median"></div></div>
+    </div>
+
+    <canvas id="fanChart" style="display:none;"></canvas>
+
+    <p class="note">Simulation Monte Carlo (5000 scénarios). Les paramètres par défaut sont des hypothèses illustratives, pas des statistiques réelles.</p>
+
+    <script>
+        let chart = null;
+
+        async function runSimulation() {
+            const payload = {
+                initial_savings: parseFloat(document.getElementById('initial_savings').value),
+                monthly_contribution: parseFloat(document.getElementById('monthly_contribution').value),
+                horizon_years: parseInt(document.getElementById('horizon_years').value),
+                annual_event_probability: parseFloat(document.getElementById('annual_event_probability').value) / 100,
+                median_event_cost: parseFloat(document.getElementById('median_event_cost').value),
+            };
+
+            const res = await fetch('/finance/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) { alert('Erreur de simulation : vérifie les valeurs saisies.'); return; }
+            const data = await res.json();
+
+            document.getElementById('cards').style.display = 'flex';
+            document.getElementById('shortfall').textContent = (data.shortfall_probability * 100).toFixed(1) + ' %';
+            document.getElementById('fund').textContent = data.recommended_fund.toLocaleString('fr-FR') + ' €';
+            document.getElementById('median').textContent = data.final_balance.p50.toLocaleString('fr-FR') + ' €';
+
+            const fc = data.fan_chart;
+            const labels = fc.years.map(y => 'Année ' + y);
+            const canvas = document.getElementById('fanChart');
+            canvas.style.display = 'block';
+            if (chart) chart.destroy();
+
+            chart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Favorable (p90)', data: fc.p90, borderColor: '#9bb8ff', pointRadius: 0, tension: 0.3 },
+                        { label: 'Médiane (p50)', data: fc.p50, borderColor: '#4f7cff', borderWidth: 2.5, pointRadius: 0, tension: 0.3 },
+                        { label: 'Défavorable (p10)', data: fc.p10, borderColor: '#9bb8ff', backgroundColor: 'rgba(79,124,255,0.15)', fill: '-2', pointRadius: 0, tension: 0.3 },
+                    ],
+                },
+                options: { scales: { y: { title: { display: true, text: 'Épargne (€)' } } } },
+            });
+        }
+    </script>
+</body>
+</html>

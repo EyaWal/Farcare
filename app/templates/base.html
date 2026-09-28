@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}FarCare{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    {% set p = request.url.path %}
+    <header class="topbar">
+        <div class="wrap">
+            <a class="brand" href="/dashboard">FarCare</a>
+            <nav>
+                <a href="/dashboard" {% if p == '/dashboard' %}aria-current="page"{% endif %}>Suivi</a>
+                <a href="/checkin/new" {% if p == '/checkin/new' %}aria-current="page"{% endif %}>Nouveau check-in</a>
+                <a href="/simulator" {% if p == '/simulator' %}aria-current="page"{% endif %}>Simulateur</a>
+            </nav>
+        </div>
+    </header>
+    <main class="wrap">
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

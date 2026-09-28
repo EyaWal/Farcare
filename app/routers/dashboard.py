@@ -37,3 +37,6 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 @router.get("/simulator")
 def simulator(request: Request):
     return templates.TemplateResponse("simulator.html", {"request": request})
+@router.get("/checkin/new")
+def new_checkin_form(request: Request):
+    return templates.TemplateResponse("checkin_form.html", {"request": request})

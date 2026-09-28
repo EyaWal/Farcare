@@ -1,91 +1,113 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>FarCare — Simulateur</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-    <style>
-        body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
-        h1 { font-size: 1.4rem; }
-        .form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 20px 0; }
-        label { font-size: 0.85rem; color: #555; display: block; margin-bottom: 4px; }
-        input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        button { padding: 10px 18px; border: none; border-radius: 6px; background: #4f7cff; color: white; cursor: pointer; }
-        .cards { display: flex; gap: 16px; margin: 24px 0; flex-wrap: wrap; }
-        .card { flex: 1; min-width: 180px; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; }
-        .card .value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
-        .card .label { font-size: 0.8rem; color: #666; }
-        .note { font-size: 0.8rem; color: #888; margin-top: 24px; }
-        a { color: #4f7cff; }
-    </style>
-</head>
-<body>
-    <h1>FarCare — Simulateur de fonds d'urgence</h1>
-    <p><a href="/dashboard">← Retour au suivi</a></p>
+{% extends "base.html" %}
+{% block title %}Simulateur — FarCare{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+{% endblock %}
 
-    <div class="form">
-        <div><label>Épargne actuelle (€)</label><input id="initial_savings" type="number" value="2000"></div>
-        <div><label>Épargne mensuelle (€)</label><input id="monthly_contribution" type="number" value="150"></div>
-        <div><label>Horizon (années)</label><input id="horizon_years" type="number" value="10"></div>
-        <div><label>Risque annuel d'événement (%)</label><input id="annual_event_probability" type="number" value="15"></div>
-        <div><label>Coût médian d'un événement (€)</label><input id="median_event_cost" type="number" value="3000"></div>
+{% block content %}
+<h1>Combien mettre de côté ?</h1>
+<p class="lede">Le simulateur joue 5 000 futurs possibles, avec des dépenses de santé imprévues, pour estimer le coussin d'épargne dont tu aurais besoin.</p>
+
+<div class="grid-auto">
+    <div class="field"><label for="initial_savings">Épargne actuelle (€)</label><input id="initial_savings" type="number" value="2000"></div>
+    <div class="field"><label for="monthly_contribution">Épargne par mois (€)</label><input id="monthly_contribution" type="number" value="150"></div>
+    <div class="field"><label for="horizon_years">Horizon (années)</label><input id="horizon_years" type="number" value="10"></div>
+    <div class="field"><label for="annual_event_probability">Risque d'imprévu par an (%)</label><input id="annual_event_probability" type="number" value="15"></div>
+    <div class="field"><label for="median_event_cost">Coût médian d'un imprévu (€)</label><input id="median_event_cost" type="number" value="3000"></div>
+</div>
+<button class="btn" id="run" type="button">Lancer la simulation</button>
+<div id="error" class="error" role="alert" hidden></div>
+
+<div id="results" hidden>
+    <p class="result-line" id="sentence"></p>
+    <div class="stats">
+        <div class="stat"><div class="value" id="shortfall"></div><div class="label">de risque de passer sous zéro</div></div>
+        <div class="stat"><div class="value" id="fund"></div><div class="label">de coussin conseillé au départ</div></div>
+        <div class="stat"><div class="value" id="median"></div><div class="label" id="median-label"></div></div>
     </div>
-    <button onclick="runSimulation()">Simuler</button>
+    <figure class="plot" style="margin:0;">
+        <figcaption>Évolution de l'épargne</figcaption>
+        <canvas id="fanChart"></canvas>
+    </figure>
+    <p class="hint" style="margin-top:12px;">Les courbes « favorable » et « défavorable » encadrent 80 % des scénarios simulés. Les valeurs par défaut sont des hypothèses illustratives, pas des statistiques réelles.</p>
+</div>
+{% endblock %}
 
-    <div class="cards" id="cards" style="display:none;">
-        <div class="card"><div class="label">Risque de passer sous zéro</div><div class="value" id="shortfall"></div></div>
-        <div class="card"><div class="label">Fonds recommandé (90 % des cas)</div><div class="value" id="fund"></div></div>
-        <div class="card"><div class="label">Épargne finale médiane</div><div class="value" id="median"></div></div>
-    </div>
+{% block scripts %}
+<script>
+    let chart = null;
+    const eur = n => Math.round(n).toLocaleString("fr-FR") + " €";
+    const num = id => parseFloat(document.getElementById(id).value);
 
-    <canvas id="fanChart" style="display:none;"></canvas>
+    async function runSimulation() {
+        const btn = document.getElementById("run");
+        const err = document.getElementById("error");
+        err.hidden = true;
+        btn.disabled = true;
+        btn.textContent = "Simulation en cours…";
 
-    <p class="note">Simulation Monte Carlo (5000 scénarios). Les paramètres par défaut sont des hypothèses illustratives, pas des statistiques réelles.</p>
+        const horizon = parseInt(document.getElementById("horizon_years").value);
+        const payload = {
+            initial_savings: num("initial_savings"),
+            monthly_contribution: num("monthly_contribution"),
+            horizon_years: horizon,
+            annual_event_probability: num("annual_event_probability") / 100,
+            median_event_cost: num("median_event_cost"),
+        };
 
-    <script>
-        let chart = null;
-
-        async function runSimulation() {
-            const payload = {
-                initial_savings: parseFloat(document.getElementById('initial_savings').value),
-                monthly_contribution: parseFloat(document.getElementById('monthly_contribution').value),
-                horizon_years: parseInt(document.getElementById('horizon_years').value),
-                annual_event_probability: parseFloat(document.getElementById('annual_event_probability').value) / 100,
-                median_event_cost: parseFloat(document.getElementById('median_event_cost').value),
-            };
-
-            const res = await fetch('/finance/simulate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+        try {
+            const res = await fetch("/finance/simulate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
-            if (!res.ok) { alert('Erreur de simulation : vérifie les valeurs saisies.'); return; }
-            const data = await res.json();
+            if (!res.ok) throw new Error("bad request");
+            const d = await res.json();
 
-            document.getElementById('cards').style.display = 'flex';
-            document.getElementById('shortfall').textContent = (data.shortfall_probability * 100).toFixed(1) + ' %';
-            document.getElementById('fund').textContent = data.recommended_fund.toLocaleString('fr-FR') + ' €';
-            document.getElementById('median').textContent = data.final_balance.p50.toLocaleString('fr-FR') + ' €';
+            const riskPct = (d.shortfall_probability * 100).toFixed(1).replace(".", ",");
+            const targetPct = Math.round((1 - d.confidence) * 100);
 
-            const fc = data.fan_chart;
-            const labels = fc.years.map(y => 'Année ' + y);
-            const canvas = document.getElementById('fanChart');
-            canvas.style.display = 'block';
+            document.getElementById("sentence").textContent =
+                `Dans ${riskPct} % des simulations, l'épargne passe sous zéro au moins une fois. ` +
+                `Pour ramener ce risque à ${targetPct} %, il faudrait démarrer avec environ ${eur(d.recommended_fund)}.`;
+            document.getElementById("shortfall").textContent = riskPct + " %";
+            document.getElementById("fund").textContent = eur(d.recommended_fund);
+            document.getElementById("median").textContent = eur(d.final_balance.p50);
+            document.getElementById("median-label").textContent = `d'épargne médiane dans ${horizon} an${horizon > 1 ? "s" : ""}`;
+            document.getElementById("results").hidden = false;
+
+            Chart.defaults.font.family = '"Figtree", system-ui, sans-serif';
+            Chart.defaults.color = "#5f6e76";
+            const fc = d.fan_chart;
             if (chart) chart.destroy();
-
-            chart = new Chart(canvas, {
-                type: 'line',
+            chart = new Chart(document.getElementById("fanChart"), {
+                type: "line",
                 data: {
-                    labels: labels,
+                    labels: fc.years.map(y => "Année " + y),
                     datasets: [
-                        { label: 'Favorable (p90)', data: fc.p90, borderColor: '#9bb8ff', pointRadius: 0, tension: 0.3 },
-                        { label: 'Médiane (p50)', data: fc.p50, borderColor: '#4f7cff', borderWidth: 2.5, pointRadius: 0, tension: 0.3 },
-                        { label: 'Défavorable (p10)', data: fc.p10, borderColor: '#9bb8ff', backgroundColor: 'rgba(79,124,255,0.15)', fill: '-2', pointRadius: 0, tension: 0.3 },
+                        { label: "Favorable", data: fc.p90, borderColor: "#8bbfba", pointRadius: 0, tension: 0.3 },
+                        { label: "Médiane", data: fc.p50, borderColor: "#1f6f6b", borderWidth: 2.5, pointRadius: 0, tension: 0.3 },
+                        { label: "Défavorable", data: fc.p10, borderColor: "#8bbfba", backgroundColor: "rgba(31,111,107,0.12)", fill: "-2", pointRadius: 0, tension: 0.3 },
                     ],
                 },
-                options: { scales: { y: { title: { display: true, text: 'Épargne (€)' } } } },
+                options: {
+                    interaction: { mode: "index", intersect: false },
+                    scales: {
+                        y: { grid: { color: "#e8eeec" }, ticks: { callback: v => v.toLocaleString("fr-FR") + " €" } },
+                        x: { grid: { display: false } },
+                    },
+                },
             });
+        } catch (e) {
+            err.textContent = "La simulation a échoué. Vérifie que tous les champs sont remplis avec des nombres.";
+            err.hidden = false;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Lancer la simulation";
         }
-    </script>
-</body>
-</html>
+    }
+
+    document.getElementById("run").addEventListener("click", runSimulation);
+    runSimulation();
+</script>
+{% endblock %}

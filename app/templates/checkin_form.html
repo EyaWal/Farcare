@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Nouveau check-in — FarCare{% endblock %}
+
+{% block content %}
+<h1>Nouveau check-in</h1>
+<p class="lede">Renseigne seulement ce que tu sais. Tout est facultatif, sauf qui remplit.</p>
+
+<div class="grid-2">
+    <div class="field">
+        <label for="person_label">Personne concernée</label>
+        <input id="person_label" type="text" placeholder="ex : Maman">
+    </div>
+    <div class="field">
+        <label for="filled_by">Qui remplit ?</label>
+        <select id="filled_by">
+            <option value="proxy">Moi, après un appel</option>
+            <option value="self">La personne elle-même</option>
+        </select>
+    </div>
+</div>
+
+<div class="field">
+    <div class="label">Humeur</div>
+    <div class="choices" data-name="mood_score">
+        <button type="button" data-value="1" aria-pressed="false">1</button>
+        <button type="button" data-value="2" aria-pressed="false">2</button>
+        <button type="button" data-value="3" aria-pressed="false">3</button>
+        <button type="button" data-value="4" aria-pressed="false">4</button>
+        <button type="button" data-value="5" aria-pressed="false">5</button>
+    </div>
+    <div class="hint">1 = très basse, 5 = très bonne</div>
+</div>
+
+<div class="field">
+    <div class="label">Sommeil</div>
+    <div class="choices" data-name="sleep_quality">
+        <button type="button" data-value="1" aria-pressed="false">1</button>
+        <button type="button" data-value="2" aria-pressed="false">2</button>
+        <button type="button" data-value="3" aria-pressed="false">3</button>
+        <button type="button" data-value="4" aria-pressed="false">4</button>
+        <button type="button" data-value="5" aria-pressed="false">5</button>
+    </div>
+    <div class="hint">1 = très mauvais, 5 = très bon</div>
+</div>
+
+<div class="field">
+    <div class="label">Douleur</div>
+    <div class="choices" data-name="pain_level">
+        <button type="button" data-value="0" aria-pressed="false">0</button>
+        <button type="button" data-value="1" aria-pressed="false">1</button>
+        <button type="button" data-value="2" aria-pressed="false">2</button>
+        <button type="button" data-value="3" aria-pressed="false">3</button>
+        <button type="button" data-value="4" aria-pressed="false">4</button>
+        <button type="button" data-value="5" aria-pressed="false">5</button>
+    </div>
+    <div class="hint">0 = aucune, 5 = forte</div>
+</div>
+
+<div class="field">
+    <div class="label">Médicament pris</div>
+    <div class="choices" data-name="medication_taken">
+        <button type="button" data-value="yes" aria-pressed="false">Oui</button>
+        <button type="button" data-value="partial" aria-pressed="false">En partie</button>
+        <button type="button" data-value="no" aria-pressed="false">Non</button>
+    </div>
+</div>
+
+<div class="field">
+    <div class="label">Rendez-vous médical récent ou à venir</div>
+    <div class="choices" data-name="had_appointment">
+        <button type="button" data-value="true" aria-pressed="false">Oui</button>
+        <button type="button" data-value="false" aria-pressed="false">Non</button>
+    </div>
+</div>
+
+<div class="field">
+    <label for="appointment_note">Détail du rendez-vous</label>
+    <input id="appointment_note" type="text" placeholder="ex : cardiologue, jeudi 10h">
+</div>
+
+<div class="field">
+    <label for="free_notes">Notes</label>
+    <textarea id="free_notes" rows="3"></textarea>
+</div>
+
+<button class="btn" id="submit" type="button">Enregistrer le check-in</button>
+<div id="error" class="error" role="alert" hidden></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const state = {};
+
+    document.querySelectorAll(".choices").forEach(group => {
+        const name = group.dataset.name;
+        state[name] = null;
+        group.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const wasSelected = btn.getAttribute("aria-pressed") === "true";
+                group.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", "false"));
+                if (wasSelected) {
+                    state[name] = null;
+                } else {
+                    btn.setAttribute("aria-pressed", "true");
+                    state[name] = btn.dataset.value;
+                }
+            });
+        });
+    });
+
+    const text = id => {
+        const v = document.getElementById(id).value.trim();
+        return v === "" ? null : v;
+    };
+    const toInt = v => (v === null ? null : parseInt(v));
+
+    document.getElementById("submit").addEventListener("click", async () => {
+        const payload = {
+            person_label: text("person_label"),
+            filled_by: document.getElementById("filled_by").value,
+            mood_score: toInt(state.mood_score),
+            sleep_quality: toInt(state.sleep_quality),
+            pain_level: toInt(state.pain_level),
+            medication_taken: state.medication_taken,
+            had_appointment: state.had_appointment === null ? null : state.had_appointment === "true",
+            appointment_note: text("appointment_note"),
+            free_notes: text("free_notes"),
+        };
+
+        const res = await fetch("/checkins/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+            window.location.href = "/dashboard?saved=1";
+        } else {
+            const err = document.getElementById("error");
+            err.textContent = "Le check-in n'a pas pu être enregistré. Vérifie les valeurs puis réessaie.";
+            err.hidden = false;
+        }
+    });
+</script>
+{% endblock %}

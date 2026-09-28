@@ -58,4 +58,4 @@ def detect_anomalies(checkins: List, silence_threshold_days: int = 4, lookback: 
 def _is_declining(values: List[int]) -> bool:
     """Heuristique simple : la valeur baisse (ou stagne bas) sur au moins 3 points consécutifs."""
     diffs = [values[i + 1] - values[i] for i in range(len(values) - 1)]
-    return sum(1 for d in diffs if d < 0) >= len(diffs) * 0.6
+    return sum(1 for d in diffs if d < 0) >= len(diffs) * 0.5

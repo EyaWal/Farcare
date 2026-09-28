@@ -18,10 +18,16 @@ Quand on vit loin de parents qui vieillissent, deux questions reviennent : « es
 
 **Simulateur.** Une simulation Monte Carlo (5 000 scénarios) estime le risque de passer sous zéro face à une dépense de santé imprévue, et le coussin d'épargne à prévoir pour ramener ce risque à 10 %. Le résultat s'affiche sous forme de bande de trajectoires (favorable, médiane, défavorable).
 
-<p>
-  <img src="docs/checkin.png" alt="Formulaire de check-in" width="48%">
-  <img src="docs/simulator.png" alt="Simulateur de fonds d'urgence" width="48%">
-</p>
+<table>
+  <tr>
+    <td valign="top" width="50%">
+      <img src="docs/checkin.png" alt="Formulaire de check-in">
+    </td>
+    <td valign="top" width="50%">
+      <img src="docs/simulator.png" alt="Simulateur de fonds d'urgence">
+    </td>
+  </tr>
+</table>
 
 ## Stack technique
 
